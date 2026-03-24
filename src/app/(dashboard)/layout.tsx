@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "@/components/notification-bell";
+import { Chatbot } from "@/components/chatbot";
 import {
   LayoutDashboard,
   Building2,
@@ -156,6 +157,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
       </div>
+
+      {/* AI Chatbot */}
+      <Chatbot />
     </div>
   );
 }
