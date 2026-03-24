@@ -7,7 +7,7 @@ export type BuildingStaffRole = "RA" | "RD" | "MANAGER";
 export type RoomType = "SINGLE" | "DOUBLE" | "TRIPLE" | "SUITE";
 export type RoomStatus = "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
 export type BedSpace = "A" | "B" | "C" | "D";
-export type AssignmentStatus = "ACTIVE" | "MOVED" | "GRADUATED";
+export type AssignmentStatus = "ACTIVE" | "MOVED" | "GRADUATED" | "CHECKED_OUT";
 
 export type IncidentType = "RULE_VIOLATION" | "HEALTH" | "BEHAVIOR" | "GENERAL";
 export type Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -70,6 +70,14 @@ export interface RoomAssignment {
   startDate: Timestamp;
   endDate?: Timestamp | null;
   status: AssignmentStatus;
+}
+
+export interface RoomSelectionWindow {
+  id: string;
+  open: boolean;
+  openedAt?: Timestamp | null;
+  closedAt?: Timestamp | null;
+  openedBy: string;
 }
 
 export interface IncidentReport {
