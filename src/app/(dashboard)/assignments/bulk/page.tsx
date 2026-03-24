@@ -80,7 +80,7 @@ export default function BulkUploadPage() {
           roomNumber: row.roomNumber || "",
           bed: row.bed || "",
           valid: false,
-          error: result.error.errors.map((e) => e.message).join("; "),
+          error: result.error.issues.map((e) => e.message).join("; "),
         };
       }
       return { ...result.data, valid: true };

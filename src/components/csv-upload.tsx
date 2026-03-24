@@ -59,10 +59,10 @@ export function CsvUpload({ onFileContent }: CsvUploadProps) {
           <p className="text-sm text-gray-600 mb-2">
             Drag and drop a CSV file, or click to browse
           </p>
-          <label>
-            <Button variant="outline" size="sm" asChild>
-              <span>Choose File</span>
-            </Button>
+          <label className="cursor-pointer">
+            <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+              Choose File
+            </span>
             <input
               type="file"
               accept=".csv"

@@ -216,7 +216,7 @@ export default function RoomSelectionPage() {
       </div>
 
       {/* Building filter */}
-      <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+      <Select value={buildingFilter} onValueChange={(v) => setBuildingFilter(v ?? "all")}>
         <SelectTrigger className="w-full sm:w-64">
           <SelectValue placeholder="All Buildings" />
         </SelectTrigger>
@@ -310,7 +310,7 @@ export default function RoomSelectionPage() {
 
               <div>
                 <label className="text-sm font-medium">Choose Your Bed</label>
-                <Select value={selectedBed} onValueChange={setSelectedBed}>
+                <Select value={selectedBed} onValueChange={(v) => v && setSelectedBed(v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

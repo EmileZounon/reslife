@@ -81,7 +81,7 @@ export function MoveOutDialog({
 
           <div>
             <label className="text-sm font-medium">Reason</label>
-            <Select value={reason} onValueChange={setReason}>
+            <Select value={reason} onValueChange={(v) => v && setReason(v)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

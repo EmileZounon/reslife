@@ -84,7 +84,7 @@ export default function OccupancyPage() {
         const allBeds = Array.from({ length: room.capacity }, (_, i) =>
           String.fromCharCode(65 + i)
         );
-        const occupiedBeds = new Set(roomAssignments.map((a) => a.bedSpace));
+        const occupiedBeds = new Set<string>(roomAssignments.map((a) => a.bedSpace));
 
         const occupants = roomAssignments
           .map((a) => {
@@ -236,7 +236,7 @@ export default function OccupancyPage() {
             className="pl-10"
           />
         </div>
-        <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+        <Select value={buildingFilter} onValueChange={(v) => setBuildingFilter(v ?? "all")}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="All Buildings" />
           </SelectTrigger>
@@ -247,7 +247,7 @@ export default function OccupancyPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "all")}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="All Statuses" />
           </SelectTrigger>

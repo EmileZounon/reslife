@@ -113,7 +113,7 @@ export function AssignStudentDialog({
         <div className="space-y-4 mt-4">
           <div>
             <label className="text-sm font-medium">Student</label>
-            <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+            <Select value={selectedStudent} onValueChange={(v) => v && setSelectedStudent(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a student..." />
               </SelectTrigger>
@@ -134,7 +134,7 @@ export function AssignStudentDialog({
 
           <div>
             <label className="text-sm font-medium">Bed Space</label>
-            <Select value={selectedBed} onValueChange={setSelectedBed}>
+            <Select value={selectedBed} onValueChange={(v) => v && setSelectedBed(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select bed..." />
               </SelectTrigger>
