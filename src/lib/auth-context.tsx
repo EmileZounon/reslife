@@ -49,10 +49,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = await fbUser.getIdToken();
         document.cookie = `__session=${token}; path=/; max-age=3600; SameSite=Lax`;
 
-        const userDoc = await getDoc(doc(firestore, "users", fbUser.uid));
-        if (userDoc.exists()) {
-          setUser({ id: userDoc.id, ...userDoc.data() } as User);
-        } else {
+        try {
+          const userDoc = await getDoc(doc(firestore, "users", fbUser.uid));
+          if (userDoc.exists()) {
+            setUser({ id: userDoc.id, ...userDoc.data() } as User);
+          } else {
+            // User authenticated but no Firestore doc — create one
+            await setDoc(doc(firestore, "users", fbUser.uid), {
+              email: fbUser.email,
+              name: fbUser.displayName || "Unknown",
+              role: "STUDENT" as UserRole,
+              createdAt: Timestamp.now(),
+            });
+            setUser({
+              id: fbUser.uid,
+              email: fbUser.email || "",
+              name: fbUser.displayName || "Unknown",
+              role: "STUDENT",
+              createdAt: Timestamp.now(),
+            } as User);
+          }
+        } catch (err) {
+          console.error("Failed to load user profile:", err);
           setUser(null);
         }
       } else {
