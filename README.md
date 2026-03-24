@@ -37,6 +37,7 @@ Role-aware dashboard showing:
 
 ### Additional Features
 
+- **AI Chatbot Assistant** — Floating chatbot that explains features, guides users through tasks, and provides clickable navigation links. Powered by Claude API.
 - **AI Incident Summarization** — One-click rewrite of incident descriptions into professional report format (powered by Claude API)
 - **Email Notifications** — Automatic email delivery for important/urgent announcements via Resend
 - **Notification Bell** — In-app notification center with unread count
