@@ -27,6 +27,7 @@ import {
   LogOut,
   DoorOpen,
   BedDouble,
+  ArrowLeftRight,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -38,6 +39,7 @@ const iconMap: Record<string, React.ElementType> = {
   Megaphone,
   DoorOpen,
   BedDouble,
+  ArrowLeftRight,
 };
 
 const roleBadgeColor: Record<string, string> = {

@@ -56,6 +56,7 @@ export function getNavItems(role: UserRole) {
     { label: "Buildings", href: "/buildings", icon: "Building2", roles: ["STAFF", "ADMIN"] as UserRole[] },
     { label: "Students", href: "/students", icon: "Users", roles: ["STAFF", "ADMIN"] as UserRole[] },
     { label: "Occupancy", href: "/occupancy", icon: "DoorOpen", roles: ["STAFF", "ADMIN"] as UserRole[] },
+    { label: "Room Requests", href: "/room-requests", icon: "ArrowLeftRight", roles: ["STAFF", "ADMIN"] as UserRole[] },
     { label: "Room Selection", href: "/room-selection", icon: "BedDouble", roles: ["STUDENT"] as UserRole[] },
     { label: "Incidents", href: "/incidents", icon: "AlertTriangle", roles: ["STAFF", "ADMIN"] as UserRole[] },
     { label: "Maintenance", href: "/maintenance", icon: "Wrench", roles: ["STUDENT", "STAFF", "MAINTENANCE", "ADMIN"] as UserRole[] },
