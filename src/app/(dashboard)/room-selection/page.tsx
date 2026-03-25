@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, DoorOpen, CheckCircle, Lock, BedDouble } from "lucide-react";
+import { Building2, DoorOpen, CheckCircle, Lock, BedDouble, Clock } from "lucide-react";
 import type { Building, Room, RoomAssignment, BedSpace } from "@/types";
 
 interface RoomWithAvailability extends Room {
@@ -34,9 +34,15 @@ export default function RoomSelectionPage() {
   const [selectionOpen, setSelectionOpen] = useState<boolean | null>(null);
   const [currentAssignment, setCurrentAssignment] = useState<{
     assignmentId: string;
+    buildingId: string;
     buildingName: string;
     roomNumber: string;
     bedSpace: string;
+  } | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<{
+    desiredBuildingName: string;
+    desiredRoomNumber: string;
+    desiredBedSpace: string;
   } | null>(null);
   const [changingRoom, setChangingRoom] = useState(false);
   const [rooms, setRooms] = useState<RoomWithAvailability[]>([]);
@@ -81,20 +87,41 @@ export default function RoomSelectionPage() {
 
       // Check if current student already has an assignment
       const myAssignment = assignments.find((a) => a.userId === user?.id);
-      if (myAssignment) {
+      if (myAssignment && !changingRoom) {
         const room = roomsSnap.docs.find((d) => d.id === myAssignment.roomId);
         const building = room ? buildingsMap.get(room.data().buildingId) : undefined;
         setCurrentAssignment({
           assignmentId: myAssignment.id,
+          buildingId: myAssignment.buildingId,
           buildingName: building?.name || "Unknown",
           roomNumber: room?.data().number || "?",
           bedSpace: myAssignment.bedSpace,
         });
+
+        // Check for pending room change request
+        try {
+          const token = await getFirebaseAuth().currentUser?.getIdToken();
+          const reqRes = await fetch("/api/room-requests", {
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          });
+          const reqData = await reqRes.json();
+          const pending = (reqData.requests || []).find((r: Record<string, string>) => r.status === "PENDING");
+          if (pending) {
+            setPendingRequest({
+              desiredBuildingName: pending.desiredBuildingName,
+              desiredRoomNumber: pending.desiredRoomNumber,
+              desiredBedSpace: pending.desiredBedSpace,
+            });
+          }
+        } catch {
+          // Ignore — just won't show pending status
+        }
+
         setLoading(false);
         return;
       }
 
-      // Build available rooms list
+      // Build available rooms list (for first-time selection or change room browsing)
       const availableRooms: RoomWithAvailability[] = roomsSnap.docs
         .map((d) => {
           const room = { id: d.id, ...d.data() } as Room;
@@ -128,7 +155,7 @@ export default function RoomSelectionPage() {
       setLoading(false);
     }
     load();
-  }, [user, success]);
+  }, [user, success, changingRoom]);
 
   async function handleSelect() {
     if (!selectedRoom || !selectedBed || !user) return;
@@ -137,6 +164,38 @@ export default function RoomSelectionPage() {
 
     try {
       const token = await getFirebaseAuth().currentUser?.getIdToken();
+
+      // If student already has a room, submit a change REQUEST (not instant assignment)
+      if (currentAssignment) {
+        const res = await fetch("/api/room-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            currentAssignmentId: currentAssignment.assignmentId,
+            currentBuildingId: currentAssignment.buildingId,
+            currentBuildingName: currentAssignment.buildingName,
+            currentRoomNumber: currentAssignment.roomNumber,
+            currentBedSpace: currentAssignment.bedSpace,
+            desiredRoomId: selectedRoom.id,
+            desiredBuildingId: selectedRoom.buildingId,
+            desiredBuildingName: selectedRoom.buildingName,
+            desiredRoomNumber: selectedRoom.number,
+            desiredBedSpace: selectedBed,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || "Failed to submit request");
+          return;
+        }
+
+        setSuccess(true);
+        setSelectedRoom(null);
+        return;
+      }
+
+      // First-time assignment (no current room) — direct assignment
       const res = await fetch("/api/assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -186,7 +245,7 @@ export default function RoomSelectionPage() {
     );
   }
 
-  // Student already has a room — show current assignment with option to change
+  // Student already has a room and is NOT browsing for a change
   if (currentAssignment && !changingRoom) {
     return (
       <div className="text-center py-16">
@@ -195,99 +254,43 @@ export default function RoomSelectionPage() {
         <p className="text-gray-600">
           {currentAssignment.buildingName}, Room {currentAssignment.roomNumber}, Bed {currentAssignment.bedSpace}
         </p>
-        <div className="mt-4 flex justify-center gap-3">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              setChangingRoom(true);
-              setLoading(true);
-              try {
-                // Release current assignment first
-                const token = await getFirebaseAuth().currentUser?.getIdToken();
-                const res = await fetch("/api/assignments", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                  body: JSON.stringify({ assignmentId: currentAssignment.assignmentId, status: "MOVED" }),
-                });
-                if (!res.ok) {
-                  const data = await res.json();
-                  alert(data.error || "Failed to release current room");
-                  setChangingRoom(false);
-                  setLoading(false);
-                  return;
-                }
-                // Clear assignment and reload rooms
-                setCurrentAssignment(null);
-                setSuccess(false);
-                // Trigger useEffect reload
-                setLoading(true);
-                const selRes = await fetch("/api/assignments/selection");
-                const selData = await selRes.json();
-                setSelectionOpen(selData.open);
 
-                const db = getFirebaseDb();
-                const [buildingsSnap, roomsSnap, assignmentsSnap] = await Promise.all([
-                  getDocs(collection(db, "buildings")),
-                  getDocs(collection(db, "rooms")),
-                  getDocs(query(collection(db, "roomAssignments"), where("status", "==", "ACTIVE"))),
-                ]);
-
-                const buildingsMap = new Map<string, Building>();
-                const buildingsList: Building[] = [];
-                buildingsSnap.docs.forEach((d) => {
-                  const b = { id: d.id, ...d.data() } as Building;
-                  buildingsMap.set(d.id, b);
-                  buildingsList.push(b);
-                });
-                setBuildings(buildingsList);
-
-                const assignments = assignmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomAssignment));
-
-                const availableRooms: RoomWithAvailability[] = roomsSnap.docs
-                  .map((d) => {
-                    const room = { id: d.id, ...d.data() } as Room;
-                    if (room.status === "MAINTENANCE") return null;
-                    const building = buildingsMap.get(room.buildingId);
-                    const roomAssignments = assignments.filter((a) => a.roomId === room.id);
-                    const occupiedBeds = new Set(roomAssignments.map((a) => a.bedSpace));
-                    const allBeds = Array.from({ length: room.capacity }, (_, i) =>
-                      String.fromCharCode(65 + i)
-                    ) as BedSpace[];
-                    const availableBeds = allBeds.filter((b) => !occupiedBeds.has(b));
-                    if (availableBeds.length === 0) return null;
-                    return { ...room, buildingName: building?.name || "Unknown", occupiedBeds, availableBeds };
-                  })
-                  .filter(Boolean) as RoomWithAvailability[];
-
-                availableRooms.sort((a, b) => {
-                  if (a.buildingName !== b.buildingName) return a.buildingName.localeCompare(b.buildingName);
-                  return a.number.localeCompare(b.number);
-                });
-
-                setRooms(availableRooms);
-                setLoading(false);
-              } catch {
-                alert("Something went wrong. Please try again.");
-                setChangingRoom(false);
-                setLoading(false);
-              }
-            }}
-          >
-            Change Room
-          </Button>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">This will release your current room so you can pick a new one.</p>
+        {pendingRequest ? (
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg inline-block">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <Clock className="w-4 h-4 text-yellow-600" />
+              <p className="text-sm text-yellow-800 font-medium">Room Change Request Pending</p>
+            </div>
+            <p className="text-sm text-yellow-700">
+              Requested: {pendingRequest.desiredBuildingName}, Room {pendingRequest.desiredRoomNumber}, Bed {pendingRequest.desiredBedSpace}
+            </p>
+            <p className="text-xs text-yellow-600 mt-1">Waiting for approval from staff.</p>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => setChangingRoom(true)}>
+              Request Room Change
+            </Button>
+            <p className="text-xs text-gray-400 mt-2">Pick a new room and submit a request for approval.</p>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Success just happened
+  // Success — request submitted or room selected
   if (success) {
     return (
       <div className="text-center py-16">
         <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Room Selected!</h2>
-        <p className="text-gray-500">Your room assignment has been confirmed.</p>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          {changingRoom ? "Room Change Requested!" : "Room Selected!"}
+        </h2>
+        <p className="text-gray-500">
+          {changingRoom
+            ? "Your request has been submitted. You'll be notified when it's approved."
+            : "Your room assignment has been confirmed."}
+        </p>
       </div>
     );
   }
@@ -295,8 +298,19 @@ export default function RoomSelectionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Select Your Room</h2>
-        <p className="text-gray-500">Browse available rooms and choose your bed. First come, first served.</p>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {changingRoom ? "Request Room Change" : "Select Your Room"}
+        </h2>
+        <p className="text-gray-500">
+          {changingRoom
+            ? "Pick a new room to request a transfer. Your current room stays until approved."
+            : "Browse available rooms and choose your bed. First come, first served."}
+        </p>
+        {changingRoom && (
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setChangingRoom(false)}>
+            Cancel
+          </Button>
+        )}
       </div>
 
       {/* Building filter */}
@@ -366,7 +380,7 @@ export default function RoomSelectionPage() {
                   setError("");
                 }}
               >
-                Select This Room
+                {changingRoom ? "Request This Room" : "Select This Room"}
               </Button>
             </CardContent>
           </Card>
@@ -384,13 +398,21 @@ export default function RoomSelectionPage() {
       <Dialog open={!!selectedRoom} onOpenChange={() => setSelectedRoom(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Room Selection</DialogTitle>
+            <DialogTitle>
+              {changingRoom ? "Confirm Room Change Request" : "Confirm Room Selection"}
+            </DialogTitle>
           </DialogHeader>
           {selectedRoom && (
             <div className="space-y-4 mt-2">
               <p className="text-sm text-gray-600">
                 {selectedRoom.buildingName}, Room {selectedRoom.number} ({selectedRoom.type})
               </p>
+
+              {changingRoom && (
+                <p className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
+                  This will submit a request for approval. Your current room stays until the request is approved by staff.
+                </p>
+              )}
 
               <div>
                 <label className="text-sm font-medium">Choose Your Bed</label>
@@ -413,7 +435,11 @@ export default function RoomSelectionPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleSelect} disabled={submitting}>
-                  {submitting ? "Confirming..." : "Confirm Selection"}
+                  {submitting
+                    ? "Submitting..."
+                    : changingRoom
+                    ? "Submit Request"
+                    : "Confirm Selection"}
                 </Button>
               </div>
             </div>
