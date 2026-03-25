@@ -80,6 +80,34 @@ export interface RoomSelectionWindow {
   openedBy: string;
 }
 
+export type RoomChangeStatus = "PENDING" | "APPROVED" | "DENIED";
+
+export interface RoomChangeRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  // Current room
+  currentAssignmentId: string;
+  currentBuildingId: string;
+  currentBuildingName: string;
+  currentRoomNumber: string;
+  currentBedSpace: string;
+  // Desired room
+  desiredRoomId: string;
+  desiredBuildingId: string;
+  desiredBuildingName: string;
+  desiredRoomNumber: string;
+  desiredBedSpace: string;
+  // Status
+  status: RoomChangeStatus;
+  requestedAt: Timestamp;
+  resolvedAt?: Timestamp | null;
+  resolvedBy?: string | null;
+  resolvedByName?: string | null;
+  denyReason?: string | null;
+}
+
 export interface IncidentReport {
   id: string;
   reporterId: string;
