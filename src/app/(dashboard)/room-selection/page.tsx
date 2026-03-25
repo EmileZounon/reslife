@@ -33,10 +33,12 @@ export default function RoomSelectionPage() {
   const { user } = useAuth();
   const [selectionOpen, setSelectionOpen] = useState<boolean | null>(null);
   const [currentAssignment, setCurrentAssignment] = useState<{
+    assignmentId: string;
     buildingName: string;
     roomNumber: string;
     bedSpace: string;
   } | null>(null);
+  const [changingRoom, setChangingRoom] = useState(false);
   const [rooms, setRooms] = useState<RoomWithAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<RoomWithAvailability | null>(null);
@@ -83,6 +85,7 @@ export default function RoomSelectionPage() {
         const room = roomsSnap.docs.find((d) => d.id === myAssignment.roomId);
         const building = room ? buildingsMap.get(room.data().buildingId) : undefined;
         setCurrentAssignment({
+          assignmentId: myAssignment.id,
           buildingName: building?.name || "Unknown",
           roomNumber: room?.data().number || "?",
           bedSpace: myAssignment.bedSpace,
@@ -183,8 +186,8 @@ export default function RoomSelectionPage() {
     );
   }
 
-  // Student already has a room
-  if (currentAssignment) {
+  // Student already has a room — show current assignment with option to change
+  if (currentAssignment && !changingRoom) {
     return (
       <div className="text-center py-16">
         <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
@@ -192,7 +195,88 @@ export default function RoomSelectionPage() {
         <p className="text-gray-600">
           {currentAssignment.buildingName}, Room {currentAssignment.roomNumber}, Bed {currentAssignment.bedSpace}
         </p>
-        <p className="text-sm text-gray-500 mt-2">Contact your RA if you need to change rooms.</p>
+        <div className="mt-4 flex justify-center gap-3">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              setChangingRoom(true);
+              setLoading(true);
+              try {
+                // Release current assignment first
+                const token = await getFirebaseAuth().currentUser?.getIdToken();
+                const res = await fetch("/api/assignments", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                  body: JSON.stringify({ assignmentId: currentAssignment.assignmentId, status: "MOVED" }),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  alert(data.error || "Failed to release current room");
+                  setChangingRoom(false);
+                  setLoading(false);
+                  return;
+                }
+                // Clear assignment and reload rooms
+                setCurrentAssignment(null);
+                setSuccess(false);
+                // Trigger useEffect reload
+                setLoading(true);
+                const selRes = await fetch("/api/assignments/selection");
+                const selData = await selRes.json();
+                setSelectionOpen(selData.open);
+
+                const db = getFirebaseDb();
+                const [buildingsSnap, roomsSnap, assignmentsSnap] = await Promise.all([
+                  getDocs(collection(db, "buildings")),
+                  getDocs(collection(db, "rooms")),
+                  getDocs(query(collection(db, "roomAssignments"), where("status", "==", "ACTIVE"))),
+                ]);
+
+                const buildingsMap = new Map<string, Building>();
+                const buildingsList: Building[] = [];
+                buildingsSnap.docs.forEach((d) => {
+                  const b = { id: d.id, ...d.data() } as Building;
+                  buildingsMap.set(d.id, b);
+                  buildingsList.push(b);
+                });
+                setBuildings(buildingsList);
+
+                const assignments = assignmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomAssignment));
+
+                const availableRooms: RoomWithAvailability[] = roomsSnap.docs
+                  .map((d) => {
+                    const room = { id: d.id, ...d.data() } as Room;
+                    if (room.status === "MAINTENANCE") return null;
+                    const building = buildingsMap.get(room.buildingId);
+                    const roomAssignments = assignments.filter((a) => a.roomId === room.id);
+                    const occupiedBeds = new Set(roomAssignments.map((a) => a.bedSpace));
+                    const allBeds = Array.from({ length: room.capacity }, (_, i) =>
+                      String.fromCharCode(65 + i)
+                    ) as BedSpace[];
+                    const availableBeds = allBeds.filter((b) => !occupiedBeds.has(b));
+                    if (availableBeds.length === 0) return null;
+                    return { ...room, buildingName: building?.name || "Unknown", occupiedBeds, availableBeds };
+                  })
+                  .filter(Boolean) as RoomWithAvailability[];
+
+                availableRooms.sort((a, b) => {
+                  if (a.buildingName !== b.buildingName) return a.buildingName.localeCompare(b.buildingName);
+                  return a.number.localeCompare(b.number);
+                });
+
+                setRooms(availableRooms);
+                setLoading(false);
+              } catch {
+                alert("Something went wrong. Please try again.");
+                setChangingRoom(false);
+                setLoading(false);
+              }
+            }}
+          >
+            Change Room
+          </Button>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">This will release your current room so you can pick a new one.</p>
       </div>
     );
   }
