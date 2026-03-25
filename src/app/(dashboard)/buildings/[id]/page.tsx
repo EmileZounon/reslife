@@ -7,8 +7,13 @@ import { doc, getDoc, collection, getDocs, query, where } from "firebase/firesto
 import { getFirebaseDb } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, ArrowLeft, DoorOpen, User as UserIcon } from "lucide-react";
-import type { Building, Room, RoomAssignment, User } from "@/types";
+import { Building2, ArrowLeft, DoorOpen, User as UserIcon, Plus, LogOut as LogOutIcon } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { isStaff } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
+import { AssignStudentDialog } from "@/components/assign-student-dialog";
+import { MoveOutDialog } from "@/components/move-out-dialog";
+import type { Building, Room, RoomAssignment, User, BedSpace } from "@/types";
 
 interface RoomWithOccupants extends Room {
   occupants: Array<{ assignment: RoomAssignment; user: User }>;
@@ -20,6 +25,19 @@ export default function BuildingDetailPage() {
   const [building, setBuilding] = useState<Building | null>(null);
   const [rooms, setRooms] = useState<RoomWithOccupants[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { user: currentUser } = useAuth();
+  const canManage = isStaff(currentUser);
+
+  const [assignDialog, setAssignDialog] = useState<{
+    roomId: string; roomNumber: string; availableBeds: string[];
+  } | null>(null);
+
+  const [moveOutDialog, setMoveOutDialog] = useState<{
+    assignmentId: string; studentName: string; roomNumber: string; bedSpace: string;
+  } | null>(null);
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -70,7 +88,7 @@ export default function BuildingDetailPage() {
       setLoading(false);
     }
     load();
-  }, [buildingId]);
+  }, [buildingId, refreshKey]);
 
   if (loading) {
     return (
@@ -152,15 +170,44 @@ export default function BuildingDetailPage() {
                           >
                             <span className="font-mono text-xs w-4">{bedLabel}</span>
                             {occupant ? (
-                              <Link
-                                href={`/students/${occupant.user.id}`}
-                                className="flex items-center gap-1 text-blue-600 hover:underline"
-                              >
-                                <UserIcon className="w-3 h-3" />
-                                {occupant.user.name}
-                              </Link>
+                              <div className="flex items-center gap-1 flex-1">
+                                <Link href={`/students/${occupant.user.id}`} className="flex items-center gap-1 text-blue-600 hover:underline">
+                                  <UserIcon className="w-3 h-3" />
+                                  {occupant.user.name}
+                                </Link>
+                                {canManage && (
+                                  <button
+                                    onClick={() => setMoveOutDialog({
+                                      assignmentId: occupant.assignment.id,
+                                      studentName: occupant.user.name,
+                                      roomNumber: room.number,
+                                      bedSpace: bedLabel,
+                                    })}
+                                    className="ml-auto text-gray-400 hover:text-red-500"
+                                    title="Move out"
+                                  >
+                                    <LogOutIcon className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <span>Empty</span>
+                              <div className="flex items-center gap-1 flex-1">
+                                <span>Empty</span>
+                                {canManage && (
+                                  <button
+                                    onClick={() => setAssignDialog({
+                                      roomId: room.id,
+                                      roomNumber: room.number,
+                                      availableBeds: Array.from({ length: room.capacity }, (_, j) => String.fromCharCode(65 + j))
+                                        .filter((b) => !room.occupants.some((o) => o.assignment.bedSpace === b)),
+                                    })}
+                                    className="ml-auto text-gray-400 hover:text-blue-500"
+                                    title="Assign student"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         );
@@ -175,6 +222,31 @@ export default function BuildingDetailPage() {
             </div>
           </div>
         ))}
+
+      {assignDialog && (
+        <AssignStudentDialog
+          open={!!assignDialog}
+          onClose={() => setAssignDialog(null)}
+          roomId={assignDialog.roomId}
+          buildingId={buildingId}
+          roomNumber={assignDialog.roomNumber}
+          buildingName={building.name}
+          availableBeds={assignDialog.availableBeds as BedSpace[]}
+          onAssigned={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {moveOutDialog && (
+        <MoveOutDialog
+          open={!!moveOutDialog}
+          onClose={() => setMoveOutDialog(null)}
+          assignmentId={moveOutDialog.assignmentId}
+          studentName={moveOutDialog.studentName}
+          roomNumber={moveOutDialog.roomNumber}
+          bedSpace={moveOutDialog.bedSpace}
+          onMoveOut={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }

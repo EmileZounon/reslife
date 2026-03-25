@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { isAdmin } from "@/lib/permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Search } from "lucide-react";
+import { Users, Search, Upload } from "lucide-react";
 import type { User, RoomAssignment, Room, Building } from "@/types";
 
 interface StudentRow extends User {
@@ -18,6 +21,7 @@ interface StudentRow extends User {
 }
 
 export default function StudentsPage() {
+  const { user } = useAuth();
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -76,6 +80,14 @@ export default function StudentsPage() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Students</h2>
         <p className="text-gray-500">{students.length} students in housing</p>
+        {isAdmin(user) && (
+          <Link href="/assignments/bulk">
+            <Button size="sm" className="mt-2">
+              <Upload className="w-4 h-4 mr-1" />
+              Bulk Upload
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="relative">

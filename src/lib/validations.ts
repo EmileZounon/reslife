@@ -42,8 +42,31 @@ export const announcementSchema = z.object({
   buildingIds: z.array(z.string()).optional(),
 });
 
+export const singleAssignmentSchema = z.object({
+  userId: z.string().min(1, "Student is required"),
+  roomId: z.string().min(1, "Room is required"),
+  buildingId: z.string().min(1, "Building is required"),
+  bedSpace: z.enum(["A", "B", "C", "D"]),
+});
+
+export const bulkAssignmentRowSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+  studentId: z.string().min(1, "Student ID is required"),
+  building: z.string().min(1, "Building is required"),
+  roomNumber: z.string().min(1, "Room number is required"),
+  bed: z.enum(["A", "B", "C", "D"], { message: "Bed must be A, B, C, or D" }),
+});
+
+export const selectionWindowSchema = z.object({
+  open: z.boolean(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type IncidentInput = z.infer<typeof incidentSchema>;
 export type MaintenanceInput = z.infer<typeof maintenanceSchema>;
 export type AnnouncementInput = z.infer<typeof announcementSchema>;
+export type SingleAssignmentInput = z.infer<typeof singleAssignmentSchema>;
+export type BulkAssignmentRow = z.infer<typeof bulkAssignmentRowSchema>;
+export type SelectionWindowInput = z.infer<typeof selectionWindowSchema>;
