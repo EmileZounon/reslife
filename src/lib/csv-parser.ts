@@ -3,7 +3,7 @@ export interface CsvParseResult<T> {
   errors: Array<{ row: number; message: string }>;
 }
 
-const EXPECTED_HEADERS = ["name", "email", "studentid", "building", "roomnumber", "bed"];
+const EXPECTED_HEADERS = ["studentemail", "buildingname", "roomnumber"];
 
 /**
  * Split a CSV line respecting quoted fields (handles commas inside quotes).
@@ -54,7 +54,7 @@ export function parseCsv(text: string): CsvParseResult<Record<string, string>> {
   if (missing.length > 0) {
     return {
       rows: [],
-      errors: [{ row: 0, message: `Missing columns: ${missing.join(", ")}. Expected: Name, Email, StudentID, Building, RoomNumber, Bed` }],
+      errors: [{ row: 0, message: `Missing columns: ${missing.join(", ")}. Expected: student_email, building_name, room_number` }],
     };
   }
 
@@ -72,12 +72,9 @@ export function parseCsv(text: string): CsvParseResult<Record<string, string>> {
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => {
       const fieldMap: Record<string, string> = {
-        name: "name",
-        email: "email",
-        studentid: "studentId",
-        building: "building",
+        studentemail: "studentEmail",
+        buildingname: "buildingName",
         roomnumber: "roomNumber",
-        bed: "bed",
       };
       const field = fieldMap[h] || h;
       row[field] = values[idx];

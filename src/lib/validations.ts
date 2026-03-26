@@ -50,12 +50,9 @@ export const singleAssignmentSchema = z.object({
 });
 
 export const bulkAssignmentRowSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email"),
-  studentId: z.string().min(1, "Student ID is required"),
-  building: z.string().min(1, "Building is required"),
+  studentEmail: z.string().email("Invalid email"),
+  buildingName: z.string().min(1, "Building name is required"),
   roomNumber: z.string().min(1, "Room number is required"),
-  bed: z.enum(["A", "B", "C", "D"], { message: "Bed must be A, B, C, or D" }),
 });
 
 export const selectionWindowSchema = z.object({

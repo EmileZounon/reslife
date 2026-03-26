@@ -15,26 +15,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Download, Upload, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Download, Upload, CheckCircle, XCircle, SkipForward } from "lucide-react";
 import { CsvUpload } from "@/components/csv-upload";
 import { parseCsv } from "@/lib/csv-parser";
 import { bulkAssignmentRowSchema } from "@/lib/validations";
 
 interface ParsedRow {
-  name: string;
-  email: string;
-  studentId: string;
-  building: string;
+  studentEmail: string;
+  buildingName: string;
   roomNumber: string;
-  bed: string;
   valid: boolean;
   error?: string;
 }
 
 interface UploadResult {
   row: number;
-  status: "success" | "error";
+  status: "success" | "skipped" | "error";
   message: string;
+}
+
+interface UploadSummary {
+  total: number;
+  success: number;
+  skipped: number;
+  errors: number;
 }
 
 type PageState = "upload" | "preview" | "results";
@@ -45,6 +49,7 @@ export default function BulkUploadPage() {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [results, setResults] = useState<UploadResult[]>([]);
+  const [summary, setSummary] = useState<UploadSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Role guard: only admin/staff can access this page
@@ -72,13 +77,9 @@ export default function BulkUploadPage() {
       const result = bulkAssignmentRowSchema.safeParse(row);
       if (!result.success) {
         return {
-          ...row,
-          name: row.name || "",
-          email: row.email || "",
-          studentId: row.studentId || "",
-          building: row.building || "",
+          studentEmail: row.studentEmail || "",
+          buildingName: row.buildingName || "",
           roomNumber: row.roomNumber || "",
-          bed: row.bed || "",
           valid: false,
           error: result.error.issues.map((e) => e.message).join("; "),
         };
@@ -106,6 +107,7 @@ export default function BulkUploadPage() {
 
       const data = await res.json();
       setResults(data.results || []);
+      setSummary(data.summary || null);
       setState("results");
     } catch {
       alert("Upload failed. Please try again.");
@@ -122,7 +124,7 @@ export default function BulkUploadPage() {
         </Link>
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Bulk Room Assignment</h2>
-          <p className="text-gray-500">Upload a CSV to assign multiple students at once</p>
+          <p className="text-gray-500">Upload a CSV to assign multiple students to rooms at once</p>
         </div>
       </div>
 
@@ -131,7 +133,9 @@ export default function BulkUploadPage() {
         <CardContent className="p-4 flex items-center justify-between">
           <div>
             <p className="font-medium">CSV Template</p>
-            <p className="text-sm text-gray-500">Download and fill in the template, then upload it below</p>
+            <p className="text-sm text-gray-500">
+              Columns: student_email, building_name, room_number
+            </p>
           </div>
           <a href="/templates/room-assignments-template.csv" download>
             <Button variant="outline" size="sm">
@@ -180,24 +184,18 @@ export default function BulkUploadPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Student ID</TableHead>
+                    <TableHead>Student Email</TableHead>
                     <TableHead>Building</TableHead>
                     <TableHead>Room</TableHead>
-                    <TableHead>Bed</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {parsedRows.map((row, i) => (
                     <TableRow key={i} className={row.valid ? "" : "bg-red-50"}>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.email}</TableCell>
-                      <TableCell>{row.studentId}</TableCell>
-                      <TableCell>{row.building}</TableCell>
+                      <TableCell>{row.studentEmail}</TableCell>
+                      <TableCell>{row.buildingName}</TableCell>
                       <TableCell>{row.roomNumber}</TableCell>
-                      <TableCell>{row.bed}</TableCell>
                       <TableCell>
                         {row.valid ? (
                           <CheckCircle className="w-4 h-4 text-green-500" />
@@ -231,12 +229,39 @@ export default function BulkUploadPage() {
 
       {state === "results" && (
         <>
+          {/* Summary cards */}
+          {summary && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold">{summary.total}</p>
+                  <p className="text-sm text-gray-500">Total Rows</p>
+                </CardContent>
+              </Card>
+              <Card className="border-green-200">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-green-600">{summary.success}</p>
+                  <p className="text-sm text-gray-500">Assigned</p>
+                </CardContent>
+              </Card>
+              <Card className="border-yellow-200">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-yellow-600">{summary.skipped}</p>
+                  <p className="text-sm text-gray-500">Skipped</p>
+                </CardContent>
+              </Card>
+              <Card className="border-red-200">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-red-600">{summary.errors}</p>
+                  <p className="text-sm text-gray-500">Errors</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                Upload Complete — {results.filter((r) => r.status === "success").length} succeeded,{" "}
-                {results.filter((r) => r.status === "error").length} failed
-              </CardTitle>
+              <CardTitle className="text-base">Detailed Results</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -249,13 +274,35 @@ export default function BulkUploadPage() {
                 </TableHeader>
                 <TableBody>
                   {results.map((r, i) => (
-                    <TableRow key={i} className={r.status === "error" ? "bg-red-50" : ""}>
+                    <TableRow
+                      key={i}
+                      className={
+                        r.status === "error"
+                          ? "bg-red-50"
+                          : r.status === "skipped"
+                            ? "bg-yellow-50"
+                            : ""
+                      }
+                    >
                       <TableCell>{r.row}</TableCell>
                       <TableCell>
-                        {r.status === "success" ? (
-                          <Badge className="bg-green-100 text-green-700">Success</Badge>
-                        ) : (
-                          <Badge className="bg-red-100 text-red-700">Error</Badge>
+                        {r.status === "success" && (
+                          <Badge className="bg-green-100 text-green-700">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Assigned
+                          </Badge>
+                        )}
+                        {r.status === "skipped" && (
+                          <Badge className="bg-yellow-100 text-yellow-700">
+                            <SkipForward className="w-3 h-3 mr-1" />
+                            Skipped
+                          </Badge>
+                        )}
+                        {r.status === "error" && (
+                          <Badge className="bg-red-100 text-red-700">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Error
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-sm">{r.message}</TableCell>
@@ -267,7 +314,7 @@ export default function BulkUploadPage() {
           </Card>
 
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => { setState("upload"); setParsedRows([]); setResults([]); }}>
+            <Button variant="outline" onClick={() => { setState("upload"); setParsedRows([]); setResults([]); setSummary(null); }}>
               Upload Another
             </Button>
             <Link href="/occupancy">
